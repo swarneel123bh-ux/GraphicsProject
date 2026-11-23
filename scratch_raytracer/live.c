@@ -3,8 +3,12 @@
  * Window and controls follow the Assignment 2 app (GLFW, mouse look, WASD). The image is traced
  * on the CPU with pthreads, one row at a time, and shown as a texture on a full-window quad.
  *
- * Build (macOS, Homebrew GLFW):
- *   cc -std=c11 -O2 -Wall -pthread -I/opt/homebrew/include -L/opt/homebrew/lib -o live live.c -lglfw -framework OpenGL -lm
+ * Build: use the Makefile in the project root (make). It uses GLFW or FreeGLUT, whichever is installed.
+ * By hand, pass -DUSE_GLFW (GLFW 3) or -DUSE_FREEGLUT (FreeGLUT):
+ *   macOS (GLFW):      cc -std=c11 -O2 -pthread -DUSE_GLFW -I$(brew --prefix glfw)/include -o live live.c -L$(brew --prefix glfw)/lib -lglfw -framework OpenGL -lm
+ *   Linux (GLFW):      cc -std=c11 -O2 -pthread -DUSE_GLFW -o live live.c -lglfw -lGL -lm
+ *   Linux (FreeGLUT):  cc -std=c11 -O2 -pthread -DUSE_FREEGLUT -o live live.c -lglut -lGL -lm
+ *   Windows (GLFW):    gcc -std=c11 -O2 -pthread -DUSE_GLFW -o live.exe live.c -lglfw -lopengl32 -lgdi32 -lm   (MSYS2 MINGW64 shell)
  * Run:
  *   ./live                        interactive window
  *   ./live --snapshot out.bmp     render one frame at 640x360, no window
@@ -13,17 +17,34 @@
  * Controls: mouse look, W/A/S/D walk and strafe, Shift run, scroll or +/- zoom, R reset,
  *           1/2/3 render size 320x180 / 480x270 / 640x360, T pause/resume day-night cycle, Esc quit.
  */
+#ifdef __APPLE__
 #define _DARWIN_C_SOURCE
+#endif
+#if !defined(_WIN32)
 #define _POSIX_C_SOURCE 200809L
-#define GLFW_INCLUDE_GLU
+#endif
+#if defined(USE_GLFW)
 #include <GLFW/glfw3.h>
+#elif defined(USE_FREEGLUT)
+#include <GL/freeglut.h>
+#else
+#error "Build with -DUSE_GLFW or -DUSE_FREEGLUT (the Makefile sets this for you)"
+#endif
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
 #include <pthread.h>
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <time.h>
 #include <unistd.h>
+#endif
 
 #define PI 3.14159265358979323846
 #define INF 1e30
@@ -544,9 +565,27 @@ static void render_frame(unsigned char *img, int W, int H, View vw, int spp, int
 
 /* ---------- timing ---------- */
 static double now_ms(void) {
+#if defined(_WIN32)
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (double)count.QuadPart * 1000.0 / (double)freq.QuadPart;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+#endif
+}
+
+static int cpu_count(void) {
+#if defined(_WIN32)
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return (int)si.dwNumberOfProcessors;
+#else
+    long n = sysconf(_SC_NPROCESSORS_ONLN);
+    return n > 0 ? (int)n : 1;
+#endif
 }
 
 /* ---------- BMP output (for --snapshot) ---------- */
@@ -581,7 +620,7 @@ static int write_bmp(const char *path, int w, int h, const unsigned char *rgb) {
     return 1;
 }
 
-/* ---------- globals for the window ---------- */
+/* ---------- window state (shared by both backends) ---------- */
 static const int res_w[3] = {320, 480, 640};
 static const int res_h[3] = {180, 270, 360};
 static int res_index = 1;
@@ -591,53 +630,68 @@ static double sun_angle = 1.0;     /* radians; day-night cycle advances this */
 static unsigned char *buf;         /* MAX_W * MAX_H * 3 */
 static GLuint tex = 0;
 static int tex_w = 0, tex_h = 0;
-static int have_mouse = 0;
-static double last_mx, last_my;
+static int win_w = 1280, win_h = 720;
+static int quit_requested = 0;
 
-static void on_mouse(GLFWwindow *win, double x, double y) {
-    (void)win;
-    if (have_mouse) {
-        cam.yaw += (x - last_mx) * MOUSE_SENS;
-        cam.pitch += (last_my - y) * MOUSE_SENS;
-        if (cam.pitch > 89) cam.pitch = 89;
-        if (cam.pitch < -89) cam.pitch = -89;
+/* ---------- actions and camera control (both backends call these) ---------- */
+enum { ACT_QUIT, ACT_RESET, ACT_TIME, ACT_RES1, ACT_RES2, ACT_RES3 };
+
+static void do_action(int a) {
+    switch (a) {
+    case ACT_QUIT:  quit_requested = 1; break;
+    case ACT_RESET: cam_reset(); break;
+    case ACT_TIME:  cycle_running = !cycle_running; break;
+    case ACT_RES1:  res_index = 0; break;
+    case ACT_RES2:  res_index = 1; break;
+    case ACT_RES3:  res_index = 2; break;
+    default: break;
     }
-    last_mx = x; last_my = y; have_mouse = 1;
 }
 
-static void on_scroll(GLFWwindow *win, double dx, double dy) {
-    (void)win; (void)dx;
-    cam.fov -= dy * 2.0;
+/* dx, dy in window pixels; dy grows downwards on screen */
+static void look(double dx, double dy) {
+    cam.yaw += dx * MOUSE_SENS;
+    cam.pitch -= dy * MOUSE_SENS;
+    if (cam.pitch > 89) cam.pitch = 89;
+    if (cam.pitch < -89) cam.pitch = -89;
+}
+
+/* steps > 0 zooms in */
+static void zoom(double steps) {
+    cam.fov -= steps * 2.0;
     if (cam.fov < 20) cam.fov = 20;
     if (cam.fov > 100) cam.fov = 100;
 }
 
-static void on_key(GLFWwindow *win, int key, int sc, int action, int mods) {
-    (void)sc; (void)mods;
-    if (action != GLFW_PRESS) return;
-    if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(win, 1);
-    if (key == GLFW_KEY_R) cam_reset();
-    if (key == GLFW_KEY_T) cycle_running = !cycle_running;
-    if (key == GLFW_KEY_1) res_index = 0;
-    if (key == GLFW_KEY_2) res_index = 1;
-    if (key == GLFW_KEY_3) res_index = 2;
-}
+/* ---------- held keys: GLFW polls them, FreeGLUT fills key_held from its callbacks ---------- */
+enum { KEY_W, KEY_A, KEY_S, KEY_D, KEY_RUN, KEY_ZOOM_IN, KEY_ZOOM_OUT, KEY_COUNT };
 
-static int down(GLFWwindow *win, int key) { return glfwGetKey(win, key) == GLFW_PRESS; }
+#if defined(USE_GLFW)
+static GLFWwindow *g_win;
+static const int glfw_keymap[KEY_COUNT] = {
+    GLFW_KEY_W, GLFW_KEY_A, GLFW_KEY_S, GLFW_KEY_D,
+    GLFW_KEY_LEFT_SHIFT, GLFW_KEY_EQUAL, GLFW_KEY_MINUS
+};
+static int key_down(int k) { return glfwGetKey(g_win, glfw_keymap[k]) == GLFW_PRESS; }
+#else
+static int key_held[KEY_COUNT];
+static int key_down(int k) { return key_held[k]; }
+#endif
 
-static void handle_keys(GLFWwindow *win, double dt) {
-    double move = WALK_SPEED * dt * (down(win, GLFW_KEY_LEFT_SHIFT) ? 3.0 : 1.0);
+static void handle_move(double dt) {
+    double move = WALK_SPEED * dt * (key_down(KEY_RUN) ? 3.0 : 1.0);
     double yr = cam.yaw * PI / 180.0;
     double fx = sin(yr), fz = cos(yr);      /* ground-plane forward */
     double rx = cos(yr), rz = -sin(yr);     /* ground-plane right */
-    if (down(win, GLFW_KEY_W)) { cam.x += fx * move; cam.z += fz * move; }
-    if (down(win, GLFW_KEY_S)) { cam.x -= fx * move; cam.z -= fz * move; }
-    if (down(win, GLFW_KEY_D)) { cam.x += rx * move; cam.z += rz * move; }
-    if (down(win, GLFW_KEY_A)) { cam.x -= rx * move; cam.z -= rz * move; }
-    if (down(win, GLFW_KEY_EQUAL)) cam.fov = fmax(20, cam.fov - 30 * dt);
-    if (down(win, GLFW_KEY_MINUS)) cam.fov = fmin(100, cam.fov + 30 * dt);
+    if (key_down(KEY_W)) { cam.x += fx * move; cam.z += fz * move; }
+    if (key_down(KEY_S)) { cam.x -= fx * move; cam.z -= fz * move; }
+    if (key_down(KEY_D)) { cam.x += rx * move; cam.z += rz * move; }
+    if (key_down(KEY_A)) { cam.x -= rx * move; cam.z -= rz * move; }
+    if (key_down(KEY_ZOOM_IN))  cam.fov = fmax(20, cam.fov - 30 * dt);
+    if (key_down(KEY_ZOOM_OUT)) cam.fov = fmin(100, cam.fov + 30 * dt);
 }
 
+/* ---------- drawing helpers (same for both backends) ---------- */
 static void setup_gl(void) {
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glGenTextures(1, &tex);
@@ -676,6 +730,142 @@ static void print_scene_info(void) {
     printf("scene: %d objects, %d lamps, 1 sun, %d threads\n", nobj, nlamp, nthreads);
 }
 
+static void print_controls(void) {
+    printf("controls: mouse look, WASD, Shift run, scroll/+- zoom, R reset, 1/2/3 resolution, T day-night, Esc quit\n");
+}
+
+/* ---------- backend: window, input callbacks and timing ---------- */
+static void frame(double dt);
+
+#if defined(USE_GLFW)
+static double win_time(void) { return glfwGetTime(); }
+static void win_framebuffer(int *w, int *h) { glfwGetFramebufferSize(g_win, w, h); }
+static void win_swap(void) { glfwSwapBuffers(g_win); }
+static void win_set_title(const char *t) { glfwSetWindowTitle(g_win, t); }
+
+static void glfw_cursor(GLFWwindow *w, double x, double y) {
+    static double last_x, last_y;
+    static int have = 0;
+    (void)w;
+    if (have) look(x - last_x, y - last_y);
+    last_x = x; last_y = y; have = 1;
+}
+
+static void glfw_scroll(GLFWwindow *w, double dx, double dy) {
+    (void)w; (void)dx;
+    zoom(dy);
+}
+
+static void glfw_key(GLFWwindow *w, int key, int sc, int action, int mods) {
+    (void)w; (void)sc; (void)mods;
+    if (action != GLFW_PRESS) return;
+    switch (key) {
+    case GLFW_KEY_ESCAPE: do_action(ACT_QUIT); break;
+    case GLFW_KEY_R:      do_action(ACT_RESET); break;
+    case GLFW_KEY_T:      do_action(ACT_TIME); break;
+    case GLFW_KEY_1:      do_action(ACT_RES1); break;
+    case GLFW_KEY_2:      do_action(ACT_RES2); break;
+    case GLFW_KEY_3:      do_action(ACT_RES3); break;
+    default: break;
+    }
+}
+#else
+static double g_last_t = 0;
+
+static double win_time(void) { return glutGet(GLUT_ELAPSED_TIME) / 1000.0; }
+static void win_framebuffer(int *w, int *h) { *w = glutGet(GLUT_WINDOW_WIDTH); *h = glutGet(GLUT_WINDOW_HEIGHT); }
+static void win_swap(void) { glutSwapBuffers(); }
+static void win_set_title(const char *t) { glutSetWindowTitle(t); }
+
+/* FreeGLUT reports Shift only inside key callbacks, so run mode updates on key presses and releases */
+static void glut_key_down(unsigned char key, int x, int y) {
+    (void)x; (void)y;
+    key_held[KEY_RUN] = (glutGetModifiers() & GLUT_ACTIVE_SHIFT) != 0;
+    switch (tolower(key)) {
+    case 'w': key_held[KEY_W] = 1; break;
+    case 'a': key_held[KEY_A] = 1; break;
+    case 's': key_held[KEY_S] = 1; break;
+    case 'd': key_held[KEY_D] = 1; break;
+    case '=': case '+': key_held[KEY_ZOOM_IN] = 1; break;
+    case '-': case '_': key_held[KEY_ZOOM_OUT] = 1; break;
+    case 27:  do_action(ACT_QUIT); break;
+    case 'r': do_action(ACT_RESET); break;
+    case 't': do_action(ACT_TIME); break;
+    case '1': do_action(ACT_RES1); break;
+    case '2': do_action(ACT_RES2); break;
+    case '3': do_action(ACT_RES3); break;
+    default: break;
+    }
+}
+
+static void glut_key_up(unsigned char key, int x, int y) {
+    (void)x; (void)y;
+    key_held[KEY_RUN] = (glutGetModifiers() & GLUT_ACTIVE_SHIFT) != 0;
+    switch (tolower(key)) {
+    case 'w': key_held[KEY_W] = 0; break;
+    case 'a': key_held[KEY_A] = 0; break;
+    case 's': key_held[KEY_S] = 0; break;
+    case 'd': key_held[KEY_D] = 0; break;
+    case '=': case '+': key_held[KEY_ZOOM_IN] = 0; break;
+    case '-': case '_': key_held[KEY_ZOOM_OUT] = 0; break;
+    default: break;
+    }
+}
+
+/* Mouse look without a hidden cursor: keep the pointer at the window centre and use the offset */
+static void glut_motion(int x, int y) {
+    int cx = glutGet(GLUT_WINDOW_WIDTH) / 2, cy = glutGet(GLUT_WINDOW_HEIGHT) / 2;
+    if (x == cx && y == cy) return;
+    look(x - cx, y - cy);
+    glutWarpPointer(cx, cy);
+}
+
+static void glut_wheel(int wheel, int direction, int x, int y) {
+    (void)wheel; (void)x; (void)y;
+    zoom(direction);
+}
+
+static void glut_display(void) { /* frames are drawn from the idle callback */ }
+
+static void glut_idle(void) {
+    double now = win_time();
+    frame(now - g_last_t);
+    g_last_t = now;
+    if (quit_requested) glutLeaveMainLoop();
+}
+#endif
+
+/* ---------- one frame: move, light, trace, show ---------- */
+static void frame(double dt) {
+    static double ms_avg = 0, title_t = 0;
+    char title[256];
+    if (dt > 0.1) dt = 0.1;
+
+    handle_move(dt);
+    if (cycle_running) sun_angle += 0.12 * dt;
+    update_light(sun_angle);
+
+    int w = res_w[res_index], h = res_h[res_index];
+    int fbw, fbh;
+    win_framebuffer(&fbw, &fbh);
+
+    double t0 = now_ms();
+    render_frame(buf, w, h, current_view(), 1, nthreads);
+    double ms = now_ms() - t0;
+    ms_avg = ms_avg == 0 ? ms : 0.9 * ms_avg + 0.1 * ms;
+
+    upload_and_draw(w, h, fbw, fbh);
+    win_swap();
+
+    double now = win_time();
+    if (now - title_t > 0.25) {
+        title_t = now;
+        snprintf(title, sizeof title, "City ray tracer | %dx%d | %.1f FPS (%.1f ms) | %s",
+                 w, h, 1000.0 / ms_avg, ms_avg, cycle_running ? "day/night on" : "time paused");
+        win_set_title(title);
+    }
+}
+
 /* ---------- headless modes ---------- */
 static int run_snapshot(const char *path) {
     build_scene();
@@ -708,69 +898,79 @@ static int run_bench(int frames) {
     return 0;
 }
 
+/* ---------- window main loop ---------- */
+#if defined(USE_GLFW)
+static int run_window(int argc, char **argv) {
+    (void)argc; (void)argv;
+    if (!glfwInit()) { fprintf(stderr, "Could not start GLFW\n"); return 1; }
+    g_win = glfwCreateWindow(win_w, win_h, "City ray tracer", NULL, NULL);
+    if (!g_win) { fprintf(stderr, "Could not open a window\n"); glfwTerminate(); return 1; }
+    glfwMakeContextCurrent(g_win);
+    glfwSwapInterval(0);                           /* no vsync: show the real render rate */
+    glfwSetInputMode(g_win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetCursorPosCallback(g_win, glfw_cursor);
+    glfwSetScrollCallback(g_win, glfw_scroll);
+    glfwSetKeyCallback(g_win, glfw_key);
+
+    setup_gl();
+    build_scene();
+    cam_reset();
+    print_scene_info();
+    print_controls();
+
+    double last = glfwGetTime();
+    while (!glfwWindowShouldClose(g_win) && !quit_requested) {
+        glfwPollEvents();
+        double now = glfwGetTime();
+        frame(now - last);
+        last = now;
+    }
+
+    glDeleteTextures(1, &tex);
+    glfwDestroyWindow(g_win);
+    glfwTerminate();
+    return 0;
+}
+#else
+static int run_window(int argc, char **argv) {
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+    glutInitWindowSize(win_w, win_h);
+    glutCreateWindow("City ray tracer");
+    glutDisplayFunc(glut_display);
+    glutIdleFunc(glut_idle);
+    glutKeyboardFunc(glut_key_down);
+    glutKeyboardUpFunc(glut_key_up);
+    glutPassiveMotionFunc(glut_motion);
+    glutMotionFunc(glut_motion);
+    glutMouseWheelFunc(glut_wheel);
+    glutSetCursor(GLUT_CURSOR_NONE);
+    glutWarpPointer(win_w / 2, win_h / 2);
+
+    setup_gl();
+    build_scene();
+    cam_reset();
+    print_scene_info();
+    print_controls();
+
+    g_last_t = win_time();
+    glutMainLoop();
+
+    glDeleteTextures(1, &tex);
+    return 0;
+}
+#endif
+
 /* ---------- main ---------- */
 int main(int argc, char **argv) {
-    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
-    nthreads = ncpu > 0 ? (int)ncpu : 1;
+    nthreads = cpu_count();
     if (nthreads > MAX_THREADS) nthreads = MAX_THREADS;
     buf = malloc((size_t)MAX_W * MAX_H * 3);
 
     if (argc >= 3 && strcmp(argv[1], "--snapshot") == 0) return run_snapshot(argv[2]);
     if (argc >= 3 && strcmp(argv[1], "--bench") == 0) return run_bench(atoi(argv[2]));
 
-    if (!glfwInit()) { fprintf(stderr, "Could not start GLFW\n"); return 1; }
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "City ray tracer", NULL, NULL);
-    if (!window) { fprintf(stderr, "Could not open a window\n"); glfwTerminate(); return 1; }
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(0);                           /* no vsync: show the real render rate */
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetCursorPosCallback(window, on_mouse);
-    glfwSetScrollCallback(window, on_scroll);
-    glfwSetKeyCallback(window, on_key);
-
-    setup_gl();
-    build_scene();
-    cam_reset();
-    print_scene_info();
-    printf("controls: mouse look, WASD, Shift run, scroll/+- zoom, R reset, 1/2/3 resolution, T day-night, Esc quit\n");
-
-    double last = glfwGetTime();
-    double ms_avg = 0, title_t = 0;
-    char title[256];
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-        double now = glfwGetTime();
-        double dt = now - last;
-        last = now;
-        if (dt > 0.1) dt = 0.1;
-
-        handle_keys(window, dt);
-        if (cycle_running) sun_angle += 0.12 * dt;
-        update_light(sun_angle);
-
-        int w = res_w[res_index], h = res_h[res_index];
-        int fbw, fbh;
-        glfwGetFramebufferSize(window, &fbw, &fbh);
-
-        double t0 = now_ms();
-        render_frame(buf, w, h, current_view(), 1, nthreads);
-        double ms = now_ms() - t0;
-        ms_avg = ms_avg == 0 ? ms : 0.9 * ms_avg + 0.1 * ms;
-
-        upload_and_draw(w, h, fbw, fbh);
-        glfwSwapBuffers(window);
-
-        if (now - title_t > 0.25) {
-            title_t = now;
-            snprintf(title, sizeof title, "City ray tracer | %dx%d | %.1f FPS (%.1f ms) | %s",
-                     w, h, 1000.0 / ms_avg, ms_avg, cycle_running ? "day/night on" : "time paused");
-            glfwSetWindowTitle(window, title);
-        }
-    }
-
-    glDeleteTextures(1, &tex);
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    int rc = run_window(argc, argv);
     free(buf);
-    return 0;
+    return rc;
 }
