@@ -1,4 +1,4 @@
-/* live.c - walk around a city block while it is ray traced on the CPU (scratch, not for submission).
+/* live.c - walk around a city block while it is ray traced on the CPU, IS F311 Computer Graphics project.
  *
  * Window and controls follow the Assignment 2 app (GLFW, mouse look, WASD). The image is traced
  * on the CPU with pthreads, one row at a time, and shown as a texture on a full-window quad.

@@ -1,6 +1,6 @@
 # `live.c`: City Ray Tracer
 
-`scratch_raytracer/live.c` is a single-file C program (about 980 lines) that ray traces a small city block on the CPU and shows the result in a window. You can walk around the scene with the keyboard and mouse while it renders. It is a scratch project and is not meant for submission.
+`scratch_raytracer/live.c` is a single-file C program (about 980 lines) that ray traces a small city block on the CPU and shows the result in a window. You can walk around the scene with the keyboard and mouse while it renders. It is the IS F311 Computer Graphics project.
 
 The file contains:
 
