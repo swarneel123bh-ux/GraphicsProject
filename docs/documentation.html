@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>City Ray Tracer – Project Documentation</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --paper: #ffffff; --ink: #1f2328; --muted: #5b6470;
+    --line: #e3e0d8; --accent: #8a3b2e; --accent-soft: #f4e9e5; --code-bg: #f3f1ec;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.65 Georgia, "Times New Roman", serif; }
+  header.site { background: var(--paper); border-bottom: 1px solid var(--line); }
+  header.site .wrap { padding: 26px 20px 22px; }
+  .course { font: 600 13px/1.4 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 6px 0 10px; font-size: 32px; line-height: 1.2; }
+  .meta { font-size: 15px; color: var(--muted); margin: 0; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .layout { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 36px; padding: 0 20px; }
+  nav.toc { position: sticky; top: 0; align-self: start; padding: 28px 0; max-height: 100vh; overflow-y: auto; }
+  nav.toc a { display: block; font: 14px/1.4 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--muted); text-decoration: none; padding: 5px 0 5px 10px; border-left: 2px solid var(--line); }
+  nav.toc a:hover { color: var(--accent); border-left-color: var(--accent); }
+  nav.toc a.sub { padding-left: 22px; font-size: 13px; }
+  main { padding: 20px 0 60px; min-width: 0; }
+  section { scroll-margin-top: 12px; }
+  h2 { font-size: 25px; margin: 44px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  h3 { font-size: 19px; margin: 28px 0 6px; scroll-margin-top: 12px; }
+  p, li { max-width: 75ch; }
+  a { color: var(--accent); }
+  code, pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 14px; background: var(--code-bg); border-radius: 4px; }
+  code { padding: 1px 5px; }
+  pre { padding: 14px 16px; overflow-x: auto; line-height: 1.5; }
+  .abstract { background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 14px 20px; margin: 22px 0; }
+  .abstract strong { display: block; font: 600 13px/1.6 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  figure { margin: 22px 0; }
+  figure img, figure svg { width: 100%; height: auto; display: block; border: 1px solid var(--line); background: var(--paper); }
+  figcaption { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .gallery figure { margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 6px; font-size: 15px; background: var(--paper); }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--accent-soft); font-weight: 600; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { height: 12px; background: var(--accent); border-radius: 2px; }
+  .note { background: var(--accent-soft); border-radius: 4px; padding: 10px 14px; font-size: 15px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; text-decoration: none; color: var(--ink); }
+  .card b { display: block; color: var(--accent); font: 600 15px/1.4 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .card span { font-size: 14px; color: var(--muted); }
+  footer { border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); padding: 16px 20px 28px; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; gap: 0; }
+    nav.toc { position: static; max-height: none; padding: 16px 0 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    nav.toc a { border-left: 0; padding: 2px 0; }
+    nav.toc a.sub { display: none; }
+    .gallery, .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<header class="site"><div class="wrap">
+  <div class="course">IS F311 Computer Graphics · BITS Pilani, Hyderabad Campus · Project</div>
+  <h1>Real-Time CPU Ray Tracing of a Lit City Block</h1>
+  <p class="meta">Swarneel Bhattacharjee ([BITS ID]) · Siddharth Sastri ([BITS ID])<br>
+  Source: <code>scratch_raytracer/live.c</code> · Build: <code>Makefile</code> · API reference: <a href="api/index.html">Doxygen documentation</a></p>
+</div></header>
+
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <a href="#overview">1. Overview</a>
+  <a href="#running">2. Building and running</a>
+  <a href="#algorithm">3. Algorithm</a>
+  <a class="sub" href="#raytracing">3.1 Ray tracing</a>
+  <a class="sub" href="#paper">3.2 Grid traversal</a>
+  <a class="sub" href="#parallel">3.3 Parallel rendering</a>
+  <a href="#implementation">4. Implementation</a>
+  <a href="#results">5. Results</a>
+  <a class="sub" href="#gallery">5.1 Gallery</a>
+  <a class="sub" href="#grid-effect">5.2 Effect of the grid</a>
+  <a class="sub" href="#threads">5.3 Multithreading</a>
+  <a class="sub" href="#fps">5.4 Frame rate</a>
+  <a href="#issues">6. Issues in coding</a>
+  <a href="#faults">7. Known faults</a>
+  <a href="#improvements">8. Improvements</a>
+  <a href="#references">9. References</a>
+  <a href="#remarks">10. Remarks</a>
+  <a href="#files">11. Files</a>
+</nav>
+
+<main>
+<div class="abstract">
+  <strong>Abstract</strong>
+  This project implements a Whitted-style ray tracer in C that renders a small procedurally generated city on the CPU,
+  fast enough to walk through it in a window. The concept taken from the literature is the
+  <em>fast voxel traversal algorithm</em> of Amanatides and Woo [5]: rays walk a uniform grid [6] cell by cell, so each ray
+  only tests the objects near its path. The renderer supports boxes, spheres, cylinders and cones, hard shadows from a sun and
+  four street lamps, and mirror reflections. Image rows are traced in parallel with POSIX threads. On an 8-core Apple M3
+  the program renders 480 × 270 frames at about 34 frames per second, and the grid makes rendering 3.65 times faster than
+  testing every object.
+</div>
+
+<figure>
+  <img src="img/sphere.png" alt="Reflective red sphere in the middle of the street, with buildings and a lamp post reflected on it">
+  <figcaption>Figure 1. The reflective sphere at the central crossing. Buildings, road markings and sky are reflected on the
+  sphere and the ground, and the sphere casts a hard sun shadow.</figcaption>
+</figure>
+
+<section id="overview">
+  <h2>1. Overview</h2>
+  <p>The aim of the project was to learn a technique not covered in class by reading a research paper, implement it, and
+  show its effect in a working program. Ray tracing gives correct shadows and reflections almost for free, but a naive ray
+  tracer tests every ray against every object, which is too slow for interactive use. Amanatides and Woo [5] describe how to
+  step a ray through a uniform grid using only additions and comparisons. This project uses that method to make a CPU ray
+  tracer interactive.</p>
+  <p>The program:</p>
+  <ul>
+    <li>builds a city block: a ground plane, road markings, 33 buildings of random height and colour, a mirror-like sphere
+      and four lamp posts with glowing bulbs;</li>
+    <li>ray traces every frame on the CPU with shadows, point lights, a sun, a sky gradient and reflections;</li>
+    <li>opens a window (GLFW or FreeGLUT) in which you walk around with the mouse and keyboard;</li>
+    <li>has two headless modes: <code>--snapshot</code> writes one image to a BMP file and <code>--bench</code> measures the frame rate.</li>
+  </ul>
+  <div class="cards">
+    <a class="card" href="api/live_8c.html"><b>live.c reference</b><span>Every function, type and constant</span></a>
+    <a class="card" href="api/live_8c_source.html"><b>Annotated source</b><span>Full source with cross-links</span></a>
+    <a class="card" href="api/annotated.html"><b>Data structures</b><span>V3, Obj, Lamp, Cam, View, Job, Worker</span></a>
+  </div>
+</section>
+
+<section id="running">
+  <h2>2. Building and running</h2>
+  <p>Install GLFW (preferred) or FreeGLUT, then run from the project root:</p>
+<pre>make                                   # builds build/live-glfw or build/live-freeglut
+make run-live                          # build and open the window
+./build/live-glfw --snapshot out.bmp   # one 640x360 frame, no window
+./build/live-glfw --bench 60           # 60 frames along the road, prints FPS
+doxygen Doxyfile                       # regenerates docs/api</pre>
+  <table>
+    <tr><th>Input</th><th>Action</th></tr>
+    <tr><td>Mouse</td><td>Look around</td></tr>
+    <tr><td>W / A / S / D</td><td>Walk forward, left, back, right (hold Shift to run 3× faster)</td></tr>
+    <tr><td>Scroll, <code>+</code> / <code>-</code></td><td>Zoom (field of view 20°–100°)</td></tr>
+    <tr><td><code>1</code> / <code>2</code> / <code>3</code></td><td>Render size 320×180, 480×270, 640×360</td></tr>
+    <tr><td><code>R</code> / <code>Esc</code></td><td>Reset camera / quit</td></tr>
+  </table>
+</section>
+
+<section id="algorithm">
+  <h2>3. Algorithm</h2>
+
+  <h3 id="raytracing">3.1 Recursive ray tracing</h3>
+  <p>The renderer follows Whitted's model [1]. For each pixel a primary ray is sent from the eye through the pixel. The
+  nearest surface hit gives a point <em>p</em> with normal <em>n</em>. From <em>p</em> the program sends a
+  <strong>shadow ray</strong> towards each light, to find out whether the light is blocked, and, if the surface is
+  reflective, a <strong>reflected ray</strong> that is traced the same way. A ray that hits nothing takes the sky colour,
+  a gradient from the horizon colour to the zenith colour. Recursion stops after two reflections (<code>MAX_DEPTH = 2</code>).</p>
+  <p>Shading is the ambient and diffuse part of the Phong illumination model [2], without the specular term. For a surface
+  of colour <em>c</em>:</p>
+<pre>C  = c·A                                                ambient
+   + c·S·k_s·max(0, n·l_sun)                             if the sun is visible
+   + Σ_i c·L_i·k_i·max(0, n·l_i) / (1 + 0.08·d_i²)       for each visible lamp i
+C' = (1 − r)·C + r·trace(reflected ray)                 if reflectivity r &gt; 0</pre>
+  <p><em>A</em> is the ambient colour, <em>S</em> and <em>L<sub>i</sub></em> are light colours, <em>l</em> are unit vectors
+  towards the lights and <em>d<sub>i</sub></em> is the distance to lamp <em>i</em>. The reflected direction is
+  <code>r = d − 2(d·n)n</code>. The result is clamped to [0, 1] and gamma corrected with exponent 1/2.2.</p>
+  <table>
+    <tr><th>Primitive</th><th>Intersection method</th></tr>
+    <tr><td>Axis-aligned box</td><td>Slab method [3]: intersect the ray with the three pairs of parallel planes and keep the
+      overlap of the three intervals; the last entering plane gives the normal. Rays parallel to a slab are handled
+      explicitly instead of relying on IEEE infinities, the robustness case discussed by Williams et al. [4].</td></tr>
+    <tr><td>Sphere</td><td>Quadratic |o + t·d − c|² = r²; smallest root larger than a small ε.</td></tr>
+    <tr><td>Cylinder (vertical)</td><td>Quadratic in x and z for the side, height check, and two cap discs.</td></tr>
+    <tr><td>Cone (vertical)</td><td>Quadratic for the side (radius shrinks linearly to the apex), height check, base disc.</td></tr>
+  </table>
+
+  <h3 id="paper">3.2 The paper: fast voxel traversal (Amanatides and Woo, 1987)</h3>
+  <p>Testing a ray against all <em>N</em> objects costs O(<em>N</em>) per ray. A uniform grid [6] splits space into equal
+  cells and stores in each cell the objects that overlap it, so a ray only needs the objects in the cells it passes
+  through. The question is how to list those cells quickly and <em>in order along the ray</em>, so the search can stop at
+  the first hit. Amanatides and Woo [5] use an incremental algorithm similar to a line-drawing DDA. For each axis they keep:</p>
+  <ul>
+    <li><code>step</code>: +1 or −1, the direction in which the cell index changes along that axis;</li>
+    <li><code>tMax</code>: the ray parameter <em>t</em> at which the ray crosses the next cell boundary on that axis;</li>
+    <li><code>tDelta</code>: how much <em>t</em> grows to cross one whole cell on that axis (cell size / |d|).</li>
+  </ul>
+  <p>Each step moves to the neighbouring cell on the axis with the smallest <code>tMax</code> and adds that axis's
+  <code>tDelta</code> to it. There are no multiplications or divisions inside the loop.</p>
+<pre>loop:
+    test objects in cell (ix, iz); keep nearest hit t_hit
+    t_next = min(tMaxX, tMaxZ)
+    if t_next ≥ t_hit or the ray left the grid: stop
+    if tMaxX &lt; tMaxZ:  ix += stepX;  tMaxX += tDeltaX
+    else:              iz += stepZ;  tMaxZ += tDeltaZ</pre>
+
+  <figure>
+    <svg viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A ray crossing a 2D grid; the cells it visits are shaded in order">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#8a3b2e"/>
+        </marker>
+      </defs>
+      <g fill="#f4e9e5">
+        <rect x="40" y="200" width="60" height="60"/><rect x="100" y="200" width="60" height="60"/>
+        <rect x="100" y="140" width="60" height="60"/><rect x="160" y="140" width="60" height="60"/>
+        <rect x="220" y="140" width="60" height="60"/><rect x="220" y="80" width="60" height="60"/>
+      </g>
+      <rect x="280" y="80" width="60" height="60" fill="#e6c6bd"/>
+      <rect x="290" y="92" width="36" height="34" fill="#9aa5b1" stroke="#5b6470"/>
+      <g stroke="#c9c4b8" stroke-width="1">
+        <path d="M40 20 V260 M100 20 V260 M160 20 V260 M220 20 V260 M280 20 V260 M340 20 V260 M400 20 V260 M460 20 V260"/>
+        <path d="M40 20 H460 M40 80 H460 M40 140 H460 M40 200 H460 M40 260 H460"/>
+      </g>
+      <line x1="55" y1="250" x2="290" y2="122" stroke="#8a3b2e" stroke-width="2.5"/>
+      <line x1="290" y1="122" x2="440" y2="40" stroke="#8a3b2e" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arr)"/>
+      <circle cx="55" cy="250" r="5" fill="#8a3b2e"/>
+      <circle cx="290" cy="122" r="5" fill="#1f2328"/>
+      <g font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328">
+        <text x="70" y="235">1</text><text x="122" y="235">2</text><text x="122" y="175">3</text>
+        <text x="182" y="175">4</text><text x="242" y="175">5</text><text x="242" y="115">6</text>
+        <text x="300" y="138">7: hit</text>
+        <text x="40" y="285" fill="#5b6470">origin</text>
+        <text x="352" y="190" fill="#5b6470">cells beyond the hit</text>
+        <text x="352" y="207" fill="#5b6470">are never visited</text>
+      </g>
+    </svg>
+    <figcaption>Figure 2. Grid traversal seen from above (the x–z plane). The ray visits cells 1–7 in order. In cell 7 it hits
+    a building; the next cell boundary is farther than the hit, so the walk stops.</figcaption>
+  </figure>
+
+  <p><strong>Adaptation used in this project.</strong> A city is mostly flat, so the algorithm is used in two dimensions
+  over the x–z plane. Each cell is a vertical column of 4 m × 4 m, and the grid has 36 × 36 cells covering −72 m to +72 m.
+  Changes from the paper:</p>
+  <ul>
+    <li>Before walking, the ray is clipped to the grid square with a 2D slab test, so the walk starts at the grid edge when
+      the camera is outside it.</li>
+    <li>Objects with a footprint wider than 20 m (the ground) are kept in a global list tested for every ray, instead of
+      being copied into every cell.</li>
+    <li>The paper's "mailbox" (to avoid testing an object twice) is not used. Objects spanning several cells may be tested
+      again, which is cheap here and does not affect correctness: the walk stops only when the next cell begins beyond the
+      best hit.</li>
+    <li>Shadow rays use the same walk but return at the first blocking object, which is all a shadow test needs.</li>
+  </ul>
+
+  <h3 id="parallel">3.3 Parallel rendering</h3>
+  <p>Pixels are independent, so the image is split into rows. A pool of POSIX threads takes the next free row from a shared
+  counter protected by a mutex, renders it and takes another. Rows near the horizon cost more than sky rows; this dynamic
+  hand-out balances the load automatically.</p>
+</section>
+
+<section id="implementation">
+  <h2>4. Implementation</h2>
+  <p>The program is one C11 file, <code>scratch_raytracer/live.c</code>, built by the <code>Makefile</code>. It depends only on
+  the C standard library, POSIX threads, OpenGL (to show the image) and GLFW or FreeGLUT. Every function, type, constant and
+  global is documented with Doxygen comments; the generated reference is in <a href="api/index.html">api/</a>.</p>
+  <table>
+    <tr><th>Part of <code>live.c</code></th><th>Main functions</th><th>Purpose</th></tr>
+    <tr><td>Vector maths</td><td><code>V, add, sub, dot, cross, norm, mix</code></td><td>Helpers on the <code>V3</code> struct.</td></tr>
+    <tr><td>Objects</td><td><code>add_obj, add_lamp</code></td><td>Fixed arrays of objects (max 512) and lamps (max 16).</td></tr>
+    <tr><td>Intersections</td><td><code>hit_box, hit_sphere, hit_cyl, hit_cone, hit_obj</code></td><td>Ray–primitive tests returning distance and normal.</td></tr>
+    <tr><td>2D grid</td><td><code>build_grid, traverse, closest, occluded</code></td><td>Builds the grid and walks it (Amanatides–Woo).</td></tr>
+    <tr><td>Shading</td><td><code>sky, trace, update_light</code></td><td>Lighting, shadows, reflections, sky and sun settings.</td></tr>
+    <tr><td>Scene</td><td><code>build_scene, frand</code></td><td>Generates the city with a fixed random seed.</td></tr>
+    <tr><td>Camera</td><td><code>cam_reset, current_view</code></td><td>Yaw/pitch camera and its orthonormal basis.</td></tr>
+    <tr><td>Renderer</td><td><code>render_row, worker, render_frame</code></td><td>Multithreaded row-by-row rendering.</td></tr>
+    <tr><td>Output</td><td><code>write_bmp, upload_and_draw</code></td><td>BMP writer and OpenGL texture display.</td></tr>
+    <tr><td>Window back ends</td><td><code>run_window</code> and callbacks</td><td>GLFW or FreeGLUT input and main loop, chosen at compile time.</td></tr>
+    <tr><td>Headless modes</td><td><code>run_snapshot, run_bench, main</code></td><td>Command-line entry points.</td></tr>
+  </table>
+
+  <h3>Scene</h3>
+  <p><code>build_scene()</code> creates 71 objects and 4 lamps: a dark, slightly reflective 140 m × 140 m ground box; 28 thin
+  boxes for the dashed centre lines of two crossing roads; 33 buildings on a 6 × 6 layout of 12 m blocks (each block left
+  empty with probability 0.2), 7 m wide and 4–20 m tall; a red sphere with reflectivity 0.3; and four lamp posts with
+  emissive bulbs and a point light under each. A fixed random seed makes every run identical.</p>
+
+  <h3>Grid traversal in code</h3>
+  <table>
+    <tr><th>Paper</th><th><code>traverse()</code></th><th>Meaning</th></tr>
+    <tr><td>stepX, stepZ</td><td><code>sx, sz</code></td><td>±1 direction of travel per axis</td></tr>
+    <tr><td>tMaxX, tMaxZ</td><td><code>tmx, tmz</code></td><td><em>t</em> at the next cell boundary per axis</td></tr>
+    <tr><td>tDeltaX, tDeltaZ</td><td><code>tdx, tdz</code></td><td><code>GRID_CELL / |d|</code> per axis</td></tr>
+    <tr><td>X, Z</td><td><code>ix, iz</code></td><td>current cell</td></tr>
+  </table>
+<pre>for (;;) {
+    int c = ix * GRID_N + iz;
+    for (int k = 0; k &lt; cell_n[c]; k++) { ... test objs[cell_obj[c][k]] ... }
+    double tex = tmx &lt; tmz ? tmx : tmz;            /* where this cell ends        */
+    if (tex &gt;= best || tex &gt; gexit) break;          /* hit is closer, or left grid */
+    if (tmx &lt; tmz) { ix += sx; tmx += tdx; }
+    else           { iz += sz; tmz += tdz; }
+    if (ix &lt; 0 || ix &gt;= GRID_N || iz &lt; 0 || iz &gt;= GRID_N) break;
+}</pre>
+  <p>With <code>any = 0</code> the function returns the nearest hit (camera and reflection rays); with <code>any = 1</code> it
+  returns at the first blocking object and ignores emissive bulbs (shadow rays).</p>
+
+  <h3>Frame loop and window back ends</h3>
+  <p>Each frame, <code>handle_move()</code> moves the camera by the held keys scaled by frame time; <code>render_frame()</code>
+  starts one thread per core (up to 64) that take rows from the shared counter; <code>upload_and_draw()</code> copies the image
+  into an OpenGL texture and draws it on a quad that fills the window. V-sync is off so the title shows the true render speed.
+  Both window back ends provide the same small interface (<code>win_time, win_framebuffer, win_swap, win_set_title</code>)
+  and call the shared <code>look()</code>, <code>zoom()</code> and <code>do_action()</code>. The <code>Makefile</code> finds
+  whichever library is installed on macOS, Linux or Windows (MSYS2).</p>
+</section>
+
+<section id="results">
+  <h2>5. Results</h2>
+  <p class="note">All images and numbers were produced by the project code on an Apple M3 (8 cores: 4 performance, 4 efficiency),
+  macOS, <code>cc -O2</code>. Figure 3 comes from the program's own <code>--snapshot</code> mode. The gallery and the tables in
+  5.2–5.4 come from <a href="tools/experiments.c">tools/experiments.c</a>, which includes <code>live.c</code> unchanged and only
+  sets the camera, image size and thread count; its raw output is in <a href="tools/results.txt">tools/results.txt</a>.</p>
+
+  <figure>
+    <img src="img/snapshot.png" alt="640 by 360 view down the main road from the starting camera position">
+    <figcaption>Figure 3. <code>./build/live-glfw --snapshot out.bmp</code>: the starting camera view at 640 × 360 (render size 3),
+    one sample per pixel. Rendered in 60.6 ms.</figcaption>
+  </figure>
+
+  <h3 id="gallery">5.1 Gallery</h3>
+  <p>1280 × 720, 2 × 2 samples per pixel, 0.4–0.8 s per image on 8 cores.</p>
+  <div class="gallery">
+    <figure><img src="img/street.png" alt="Street-level view down the road between buildings">
+      <figcaption>(a) Start view. Building shadows cross the road; the ground reflects the street.</figcaption></figure>
+    <figure><img src="img/aerial.png" alt="Aerial view of the city block">
+      <figcaption>(b) Aerial view of all 33 buildings. The edge of the ground plane is visible against the sky.</figcaption></figure>
+    <figure><img src="img/sphere.png" alt="Close-up of the reflective sphere">
+      <figcaption>(c) The sphere: two levels of reflection (sphere in ground, street in sphere) and its shadow.</figcaption></figure>
+    <figure><img src="img/lamp.png" alt="A lamp post with its long shadow">
+      <figcaption>(d) A lamp post: the thin cylinder casts a long, sharp shadow; the bulb is an emissive sphere.</figcaption></figure>
+    <figure><img src="img/dusk.png" alt="The start view with a low sun">
+      <figcaption>(e) Low sun (<code>update_light(0.12)</code>): lower ambient, bluer sky, brighter lamps.</figcaption></figure>
+  </div>
+
+  <h3 id="grid-effect">5.2 Effect of the grid (the paper's method)</h3>
+  <p>The same 640 × 360 frame was rendered with the grid and then with every object moved to the global list, so every ray
+  tests all 71 objects. Average of 10 frames, 8 threads.</p>
+  <table>
+    <tr><th>Method</th><th class="num">Time per frame</th><th class="num">Frame rate</th><th style="width:40%"></th></tr>
+    <tr><td>Test every object</td><td class="num">198.7 ms</td><td class="num">5.0 FPS</td><td><div class="bar" style="width:100%"></div></td></tr>
+    <tr><td>Grid traversal</td><td class="num">54.4 ms</td><td class="num">18.4 FPS</td><td><div class="bar" style="width:27.4%"></div></td></tr>
+  </table>
+  <p>The grid makes the frame <strong>3.65 times faster</strong> with only 71 objects. The gain grows with scene size, since
+  a grid walk touches only the cells along the ray while brute force grows linearly with the number of objects.</p>
+
+  <h3 id="threads">5.3 Multithreading</h3>
+  <table>
+    <tr><th class="num">Threads</th><th class="num">Time per frame (640 × 360)</th><th class="num">Speed-up</th><th style="width:40%"></th></tr>
+    <tr><td class="num">1</td><td class="num">222.0 ms</td><td class="num">1.00×</td><td><div class="bar" style="width:100%"></div></td></tr>
+    <tr><td class="num">2</td><td class="num">112.8 ms</td><td class="num">1.97×</td><td><div class="bar" style="width:50.8%"></div></td></tr>
+    <tr><td class="num">4</td><td class="num">63.5 ms</td><td class="num">3.50×</td><td><div class="bar" style="width:28.6%"></div></td></tr>
+    <tr><td class="num">8</td><td class="num">53.7 ms</td><td class="num">4.13×</td><td><div class="bar" style="width:24.2%"></div></td></tr>
+  </table>
+  <p>Scaling is almost linear up to 4 threads. From 4 to 8 the gain is small because the M3's other four cores are slower
+  efficiency cores; the mutex is taken only once per row (360 times per frame).</p>
+
+  <h3 id="fps">5.4 Interactive frame rate and anti-aliasing cost</h3>
+  <table>
+    <tr><th>Render size (key)</th><th class="num">Time per frame</th><th class="num">Frame rate</th></tr>
+    <tr><td>320 × 180 (1)</td><td class="num">14.3 ms</td><td class="num">≈ 70 FPS</td></tr>
+    <tr><td>480 × 270 (2, default)</td><td class="num">30.9 ms</td><td class="num">≈ 32 FPS</td></tr>
+    <tr><td>640 × 360 (3)</td><td class="num">54.1 ms</td><td class="num">≈ 18 FPS</td></tr>
+  </table>
+  <p>The program's own benchmark (<code>--bench 60</code>, 480 × 270, walking 24 m down the road) gave 29.7, 29.6 and 29.8 ms per
+  frame in three runs: <strong>about 34 FPS</strong>.</p>
+  <table>
+    <tr><th class="num">Samples per pixel</th><th class="num">Time per frame (640 × 360)</th><th class="num">Relative</th></tr>
+    <tr><td class="num">1</td><td class="num">54.4 ms</td><td class="num">1.0×</td></tr>
+    <tr><td class="num">4 (2 × 2)</td><td class="num">209.1 ms</td><td class="num">3.8×</td></tr>
+    <tr><td class="num">9 (3 × 3)</td><td class="num">467.2 ms</td><td class="num">8.6×</td></tr>
+  </table>
+  <p>Cost grows in proportion to the samples, so the window uses one sample per pixel and the gallery uses 2 × 2.</p>
+</section>
+
+<section id="issues">
+  <h2>6. Issues in coding and how they were handled</h2>
+  <table>
+    <tr><th>Issue</th><th>Cause</th><th>Solution in <code>live.c</code></th></tr>
+    <tr><td>Shadow acne</td><td>Rounding puts the hit point slightly inside the surface, so the shadow ray hits the same surface.</td>
+      <td>Secondary rays start from <code>p + 0.001·n</code>; hits closer than <code>EPS = 1e-4</code> are ignored.</td></tr>
+    <tr><td>Lamps shadowed by their own bulbs</td><td>The light sits under an opaque emissive sphere.</td>
+      <td>Shadow rays skip emissive objects.</td></tr>
+    <tr><td>Wrong normals seen from behind</td><td>Normals point outwards, but a ray can hit the back of a face.</td>
+      <td>The normal is flipped when <code>n·d &gt; 0</code>.</td></tr>
+    <tr><td>Stopping at the first hit in the grid can return the wrong object</td><td>An object listed in the current cell can be hit at a point in a later cell, behind a closer object there.</td>
+      <td>The walk stops only when the next cell boundary is beyond the best hit (<code>tex &gt;= best</code>).</td></tr>
+    <tr><td>Ground plane in every cell</td><td>A 140 m object overlaps all 1296 cells.</td>
+      <td>Objects wider than 20 m go to a global list tested once per ray.</td></tr>
+    <tr><td>Rays from outside the grid</td><td>The walk needs a start cell, but the camera may be outside the grid.</td>
+      <td>The ray is clipped to the grid square first.</td></tr>
+    <tr><td>Unequal work per row</td><td>Sky rows are cheap, street rows with reflections are expensive.</td>
+      <td>Threads take one row at a time from a shared counter.</td></tr>
+    <tr><td>Different window libraries on different systems</td><td>Some systems have GLFW, others only FreeGLUT.</td>
+      <td>Two back ends behind one interface; the <code>Makefile</code> detects which is installed.</td></tr>
+    <tr><td>Shift and mouse capture in FreeGLUT</td><td>FreeGLUT reports modifiers only inside key callbacks and cannot hide and lock the cursor.</td>
+      <td>Run mode is updated on each key event; the pointer is warped back to the window centre.</td></tr>
+    <tr><td>High-DPI screens</td><td>The framebuffer is larger than the window on Retina displays.</td>
+      <td>The viewport uses the framebuffer size.</td></tr>
+    <tr><td>OpenGL deprecation warnings on macOS</td><td>Apple marks fixed-function OpenGL as deprecated.</td>
+      <td>Built with <code>-Wno-deprecated-declarations</code>; the API still works.</td></tr>
+  </table>
+</section>
+
+<section id="faults">
+  <h2>7. Known faults and limitations</h2>
+  <ol>
+    <li><strong>Day–night cycle not included.</strong> The proposal planned an animated day–night cycle. The final version
+      lights the scene once at a fixed sun angle; <code>update_light()</code> still supports any angle (gallery image e) but
+      nothing animates it.</li>
+    <li><strong>Fixed grid cell capacity.</strong> A cell holds at most 96 objects; beyond that the program prints
+      <code>grid cell full</code> and exits.</li>
+    <li><strong>No bounds checks</strong> in <code>add_obj()</code> and <code>add_lamp()</code> against the 512-object and 16-lamp limits.</li>
+    <li><strong>No collision detection.</strong> The camera walks through buildings, lamp posts and the sphere.</li>
+    <li><strong>Aliasing.</strong> One sample per pixel in the window gives jagged edges and flickering road lines.</li>
+    <li><strong>Translucent-looking walls.</strong> Buildings (0.05) and ground (0.12) are slightly reflective; with flat colours the
+      reflections look like faint ghost images.</li>
+    <li><strong>Visible edge of the world.</strong> The ground ends at ±70 m with a sharp line against the sky; there is no fog.</li>
+    <li><strong>Simple lighting.</strong> Hard shadows, no specular term, constant ambient, weak lamp light in daylight, and clamping
+      instead of tone mapping.</li>
+    <li><strong>Unused code.</strong> <code>hit_cone()</code> is not used by the scene, the per-thread ray counters are never reported,
+      and the program itself always uses one sample per pixel.</li>
+    <li><strong>No automated tests.</strong> Intersection routines were checked visually only.</li>
+  </ol>
+</section>
+
+<section id="improvements">
+  <h2>8. Possible improvements</h2>
+  <ul>
+    <li><strong>Performance:</strong> mailboxing from the paper; a 3D grid or bounding volume hierarchy for non-flat scenes;
+      single precision with SIMD, or a GPU compute shader; low resolution while moving with refinement when still.</li>
+    <li><strong>Image quality:</strong> Blinn–Phong specular and tone mapping; soft shadows and ambient occlusion; distance fog;
+      window textures on buildings; adaptive anti-aliasing on edges; an animated sun to restore the day–night cycle.</li>
+    <li><strong>Robustness:</strong> bounds checks and growable grid cells; camera collision with boxes and cylinders; unit
+      tests for each intersection routine.</li>
+  </ul>
+</section>
+
+<section id="references">
+  <h2>9. References</h2>
+  <ol>
+    <li>T. Whitted, "An Improved Illumination Model for Shaded Display," <em>Communications of the ACM</em>, vol. 23, no. 6, pp. 343–349, 1980.</li>
+    <li>B. T. Phong, "Illumination for Computer Generated Pictures," <em>Communications of the ACM</em>, vol. 18, no. 6, pp. 311–317, 1975.</li>
+    <li>T. L. Kay and J. T. Kajiya, "Ray Tracing Complex Scenes," <em>ACM SIGGRAPH Computer Graphics</em>, vol. 20, no. 4, pp. 269–278, 1986.</li>
+    <li>A. Williams, S. Barrus, R. K. Morley and P. Shirley, "An Efficient and Robust Ray-Box Intersection Algorithm," <em>Journal of Graphics Tools</em>, vol. 10, no. 1, pp. 49–54, 2005.</li>
+    <li><strong>J. Amanatides and A. Woo, "A Fast Voxel Traversal Algorithm for Ray Tracing," in <em>Proceedings of Eurographics 1987</em>, pp. 3–10, 1987.</strong> (Main paper.)</li>
+    <li>A. Fujimoto, T. Tanaka and K. Iwata, "ARTS: Accelerated Ray-Tracing System," <em>IEEE Computer Graphics and Applications</em>, vol. 6, no. 4, pp. 16–26, 1986.</li>
+    <li>P. Shirley and R. K. Morley, <em>Realistic Ray Tracing</em>, 2nd ed. Natick, MA: A K Peters, 2003.</li>
+    <li>GLFW documentation, <a href="https://www.glfw.org/docs/latest/">https://www.glfw.org/docs/latest/</a>.</li>
+    <li>FreeGLUT project, <a href="https://freeglut.sourceforge.net/">https://freeglut.sourceforge.net/</a>.</li>
+  </ol>
+</section>
+
+<section id="remarks">
+  <h2>10. Remarks</h2>
+  <ul>
+    <li><strong>What was learned.</strong> A good acceleration structure matters more than micro-optimisation: a 2D version of
+      the traversal, about 70 lines of code, made rendering 3.65 times faster even on a small scene. Keeping the loop to
+      additions and comparisons, as the paper does, also keeps it easy to debug.</li>
+    <li><strong>Why 2D.</strong> A 3D grid would follow the paper exactly, but in a city almost every cell above the rooftops is
+      empty. Vertical columns give the same benefit with less memory and simpler code.</li>
+    <li><strong>Reproducibility.</strong> The fixed seed and the headless modes mean every image and timing here can be
+      regenerated. Timings will differ on other machines.</li>
+    <li><strong>Portability.</strong> Built and tested on macOS with GLFW. The <code>Makefile</code> also has rules for Linux and
+      Windows (MSYS2) with GLFW or FreeGLUT.</li>
+  </ul>
+</section>
+
+<section id="files">
+  <h2>11. Files</h2>
+  <table>
+    <tr><th>Path</th><th>Contents</th></tr>
+    <tr><td><code>scratch_raytracer/live.c</code></td><td>Complete source code with Doxygen comments</td></tr>
+    <tr><td><code>scratch_raytracer/live.md</code></td><td>Developer notes on the source</td></tr>
+    <tr><td><code>Makefile</code>, <code>Doxyfile</code></td><td>Build rules and Doxygen configuration</td></tr>
+    <tr><td><code>docs/documentation.html</code></td><td>This page</td></tr>
+    <tr><td><code>docs/api/</code></td><td>Doxygen-generated code reference (open <a href="api/index.html">api/index.html</a>)</td></tr>
+    <tr><td><code>docs/img/</code></td><td>Rendered images</td></tr>
+    <tr><td><code>docs/tools/</code></td><td>Program and raw output used for the Results section</td></tr>
+  </table>
+</section>
+</main>
+</div>
+
+<footer><div class="wrap">IS F311 Computer Graphics · Project documentation</div></footer>
+</body>
+</html>

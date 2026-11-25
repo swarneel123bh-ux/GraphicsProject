@@ -1,6 +1,10 @@
 build/
-docs/
 .DS_Store
 
-# Local project report (HTML)
-report/
+# Private course material kept in docs/ (papers, proposal, idea list); only the documentation is published
+docs/*.pdf
+docs/*.docx
+docs/project_ideas_table.png
+
+# Submission zip
+*.zip

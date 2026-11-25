@@ -1,0 +1,27 @@
+scene: 71 objects, 4 lamps, 8 threads
+image street     1280x720 spp=4  671 ms
+image aerial     1280x720 spp=4  372 ms
+image sphere     1280x720 spp=4  766 ms
+image lamp       1280x720 spp=4  583 ms
+image dusk       1280x720 spp=4  632 ms
+
+threads,ms
+1,222.0
+2,112.8
+4,63.5
+8,53.7
+
+resolution,ms
+320x180,14.3
+480x270,30.9
+640x360,54.1
+
+samples,ms
+1,54.4
+4,209.1
+9,467.2
+
+accel,ms
+grid,54.4
+brute,198.7
+speedup,3.65
