@@ -345,11 +345,11 @@ C' = (1 − r)·C + r·trace(reflected ray)                 if reflectivity r &g
 
   <h3 id="threads">5.3 Multithreading</h3>
   <table>
-    <tr><th class="num">Threads</th><th class="num">Time per frame (640 × 360)</th><th class="num">Speed-up</th><th style="width:40%"></th></tr>
-    <tr><td class="num">1</td><td class="num">222.0 ms</td><td class="num">1.00×</td><td><div class="bar" style="width:100%"></div></td></tr>
-    <tr><td class="num">2</td><td class="num">112.8 ms</td><td class="num">1.97×</td><td><div class="bar" style="width:50.8%"></div></td></tr>
-    <tr><td class="num">4</td><td class="num">63.5 ms</td><td class="num">3.50×</td><td><div class="bar" style="width:28.6%"></div></td></tr>
-    <tr><td class="num">8</td><td class="num">53.7 ms</td><td class="num">4.13×</td><td><div class="bar" style="width:24.2%"></div></td></tr>
+    <tr><th class="num">Threads</th><th class="num">Time per frame (640 × 360)</th><th class="num">Speed-up</th></tr>
+    <tr><td class="num">1</td><td class="num">222.0 ms</td><td class="num">1.00×</td></tr>
+    <tr><td class="num">2</td><td class="num">112.8 ms</td><td class="num">1.97×</td></tr>
+    <tr><td class="num">4</td><td class="num">63.5 ms</td><td class="num">3.50×</td></tr>
+    <tr><td class="num">8</td><td class="num">53.7 ms</td><td class="num">4.13×</td></tr>
   </table>
   <p>Scaling is almost linear up to 4 threads. From 4 to 8 the gain is small because the M3's other four cores are slower
   efficiency cores; the mutex is taken only once per row (360 times per frame).</p>
