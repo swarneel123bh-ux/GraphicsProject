@@ -1,0 +1,30 @@
+<svg viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A ray crossing a 2D grid; the cells it visits are shaded in order">
+<defs>
+<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+<path d="M0,0 L10,5 L0,10 z" fill="#8a3b2e"/>
+</marker>
+</defs>
+<g fill="#f4e9e5">
+<rect x="40" y="200" width="60" height="60"/><rect x="100" y="200" width="60" height="60"/>
+<rect x="100" y="140" width="60" height="60"/><rect x="160" y="140" width="60" height="60"/>
+<rect x="220" y="140" width="60" height="60"/><rect x="220" y="80" width="60" height="60"/>
+</g>
+<rect x="280" y="80" width="60" height="60" fill="#e6c6bd"/>
+<rect x="290" y="92" width="36" height="34" fill="#9aa5b1" stroke="#5b6470"/>
+<g stroke="#c9c4b8" stroke-width="1">
+<path d="M40 20 V260 M100 20 V260 M160 20 V260 M220 20 V260 M280 20 V260 M340 20 V260 M400 20 V260 M460 20 V260"/>
+<path d="M40 20 H460 M40 80 H460 M40 140 H460 M40 200 H460 M40 260 H460"/>
+</g>
+<line x1="55" y1="250" x2="290" y2="122" stroke="#8a3b2e" stroke-width="2.5"/>
+<line x1="290" y1="122" x2="440" y2="40" stroke="#8a3b2e" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#arr)"/>
+<circle cx="55" cy="250" r="5" fill="#8a3b2e"/>
+<circle cx="290" cy="122" r="5" fill="#1f2328"/>
+<g font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2328">
+<text x="70" y="235">1</text><text x="122" y="235">2</text><text x="122" y="175">3</text>
+<text x="182" y="175">4</text><text x="242" y="175">5</text><text x="242" y="115">6</text>
+<text x="300" y="138">7: hit</text>
+<text x="40" y="285" fill="#5b6470">origin</text>
+<text x="352" y="190" fill="#5b6470">cells beyond the hit</text>
+<text x="352" y="207" fill="#5b6470">are never visited</text>
+</g>
+</svg>
