@@ -15,7 +15,7 @@
  *   ./live --bench 60             walk 60 frames along a fixed path, print FPS, no window
  *
  * Controls: mouse look, W/A/S/D walk and strafe, Shift run, scroll or +/- zoom, R reset,
- *           1/2/3 render size 320x180 / 480x270 / 640x360, T pause/resume day-night cycle, Esc quit.
+ *           1/2/3 render size 320x180 / 480x270 / 640x360, Esc quit.
  */
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE
@@ -418,7 +418,8 @@ static V3 trace(V3 o, V3 d, int depth) {
     return col;
 }
 
-/* Sun angle a drives the sun's height: a > 0 is day, a < 0 is night. Lamps brighten at night. */
+/* The scene is lit once at a fixed daytime angle. */
+#define SUN_ANGLE 1.0
 static void update_light(double a) {
     sun_dir = norm(V(-0.7, sin(a), 0.35));
     daylt = fmin(1.0, fmax(0.0, sun_dir.y * 3.0));
@@ -466,6 +467,7 @@ static void build_scene(void) {
         add_lamp(V(x, 4.6, z), V(1.0, 0.8, 0.5), 1.2);
     }
     build_grid();
+    update_light(SUN_ANGLE);
 }
 
 /* ---------- camera (same conventions as Assignment 2: yaw 0 looks down +z) ---------- */
@@ -625,8 +627,6 @@ static const int res_w[3] = {320, 480, 640};
 static const int res_h[3] = {180, 270, 360};
 static int res_index = 1;
 static int nthreads = 1;
-static int cycle_running = 1;
-static double sun_angle = 1.0;     /* radians; day-night cycle advances this */
 static unsigned char *buf;         /* MAX_W * MAX_H * 3 */
 static GLuint tex = 0;
 static int tex_w = 0, tex_h = 0;
@@ -634,13 +634,12 @@ static int win_w = 1280, win_h = 720;
 static int quit_requested = 0;
 
 /* ---------- actions and camera control (both backends call these) ---------- */
-enum { ACT_QUIT, ACT_RESET, ACT_TIME, ACT_RES1, ACT_RES2, ACT_RES3 };
+enum { ACT_QUIT, ACT_RESET, ACT_RES1, ACT_RES2, ACT_RES3 };
 
 static void do_action(int a) {
     switch (a) {
     case ACT_QUIT:  quit_requested = 1; break;
     case ACT_RESET: cam_reset(); break;
-    case ACT_TIME:  cycle_running = !cycle_running; break;
     case ACT_RES1:  res_index = 0; break;
     case ACT_RES2:  res_index = 1; break;
     case ACT_RES3:  res_index = 2; break;
@@ -731,7 +730,7 @@ static void print_scene_info(void) {
 }
 
 static void print_controls(void) {
-    printf("controls: mouse look, WASD, Shift run, scroll/+- zoom, R reset, 1/2/3 resolution, T day-night, Esc quit\n");
+    printf("controls: mouse look, WASD, Shift run, scroll/+- zoom, R reset, 1/2/3 resolution, Esc quit\n");
 }
 
 /* ---------- backend: window, input callbacks and timing ---------- */
@@ -762,7 +761,6 @@ static void glfw_key(GLFWwindow *w, int key, int sc, int action, int mods) {
     switch (key) {
     case GLFW_KEY_ESCAPE: do_action(ACT_QUIT); break;
     case GLFW_KEY_R:      do_action(ACT_RESET); break;
-    case GLFW_KEY_T:      do_action(ACT_TIME); break;
     case GLFW_KEY_1:      do_action(ACT_RES1); break;
     case GLFW_KEY_2:      do_action(ACT_RES2); break;
     case GLFW_KEY_3:      do_action(ACT_RES3); break;
@@ -790,7 +788,6 @@ static void glut_key_down(unsigned char key, int x, int y) {
     case '-': case '_': key_held[KEY_ZOOM_OUT] = 1; break;
     case 27:  do_action(ACT_QUIT); break;
     case 'r': do_action(ACT_RESET); break;
-    case 't': do_action(ACT_TIME); break;
     case '1': do_action(ACT_RES1); break;
     case '2': do_action(ACT_RES2); break;
     case '3': do_action(ACT_RES3); break;
@@ -842,8 +839,6 @@ static void frame(double dt) {
     if (dt > 0.1) dt = 0.1;
 
     handle_move(dt);
-    if (cycle_running) sun_angle += 0.12 * dt;
-    update_light(sun_angle);
 
     int w = res_w[res_index], h = res_h[res_index];
     int fbw, fbh;
@@ -860,8 +855,8 @@ static void frame(double dt) {
     double now = win_time();
     if (now - title_t > 0.25) {
         title_t = now;
-        snprintf(title, sizeof title, "City ray tracer | %dx%d | %.1f FPS (%.1f ms) | %s",
-                 w, h, 1000.0 / ms_avg, ms_avg, cycle_running ? "day/night on" : "time paused");
+        snprintf(title, sizeof title, "City ray tracer | %dx%d | %.1f FPS (%.1f ms)",
+                 w, h, 1000.0 / ms_avg, ms_avg);
         win_set_title(title);
     }
 }
@@ -869,7 +864,6 @@ static void frame(double dt) {
 /* ---------- headless modes ---------- */
 static int run_snapshot(const char *path) {
     build_scene();
-    update_light(sun_angle);
     cam_reset();
     double t0 = now_ms();
     render_frame(buf, 640, 360, current_view(), 1, nthreads);
@@ -888,7 +882,6 @@ static int run_bench(int frames) {
     printf("bench: %dx%d, %d frames, %d threads\n", w, h, frames, nthreads);
     for (int f = 0; f < frames; f++) {
         cam.z += 0.4;                              /* walk down the road */
-        update_light(sun_angle + 0.01 * f);        /* and let the light move */
         double t0 = now_ms();
         render_frame(buf, w, h, current_view(), 1, nthreads);
         total += now_ms() - t0;
